@@ -6,7 +6,10 @@ src=$(realpath "$src")
 base=$(dirname "$src")
 clone_pin() {
   local url=$1 dest=$2 sha=$3
-  if [[ ! -d "$dest/.git" ]]; then git clone "$url" "$dest"; fi
+  if [[ ! -d "$dest/.git" ]]; then
+    git init "$dest"
+    git -C "$dest" remote add origin "$url"
+  fi
   git -C "$dest" fetch origin "$sha" --depth 1
   git -C "$dest" checkout --detach "$sha"
 }
