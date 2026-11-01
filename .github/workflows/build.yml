@@ -1,0 +1,53 @@
+name: Build N100 OpenWrt
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 4 * * 5'
+permissions:
+  contents: write
+concurrency:
+  group: n100-build
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev python3 python3-setuptools python3-pyelftools rsync swig unzip zlib1g-dev file wget curl ca-certificates xz-utils zstd
+      - name: Select stable release within 25.12
+        id: version
+        run: |
+          set -euo pipefail
+          version=$(git ls-remote --tags --refs https://github.com/openwrt/openwrt.git 'v25.12.*' | awk -F/ '{print $3}' | grep -E '^v25\.12\.[0-9]+$' | sort -V | tail -1)
+          test -n "$version"
+          tag="n100-${version#v}-$(date -u +%Y%m%d%H%M%S)-${GITHUB_SHA:0:7}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          git clone --depth 1 --branch "$version" https://github.com/openwrt/openwrt.git source
+      - name: Configure firmware
+        run: |
+          bash prepare.sh "$PWD/source"
+          echo '${{ steps.version.outputs.tag }}' > source/files/etc/n100-build-id
+      - name: Download sources
+        run: make -C source download -j8
+      - name: Compile
+        run: make -C source -j2 V=s
+      - name: Package images
+        run: python3 package-release.py source/bin/targets/x86/64 release '${{ steps.version.outputs.tag }}'
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: n100-firmware
+          path: release/*
+      - name: Publish firmware
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "$TAG" release/* --target "$GITHUB_SHA" --title "$TAG" --notes 'N100 x86-64 customized OpenWrt. Build verified; hardware boot and upgrade require validation on your device. Automated router checks run Sunday 04:00 Asia/Shanghai.' --latest

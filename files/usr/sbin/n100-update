@@ -1,0 +1,51 @@
+#!/bin/sh
+set -eu
+log() { logger -t n100-update "$*"; echo "$*"; }
+fail() { log "Aborted: $*"; exit 1; }
+[ "$(uci -q get n100-update.main.enabled)" = 1 ] || exit 0
+mkdir /tmp/n100-update.lock 2>/dev/null || exit 0
+trap 'rm -rf /tmp/n100-update.lock' EXIT
+work=/tmp/n100-update.lock
+. /etc/openwrt_release
+[ "$DISTRIB_TARGET" = x86/64 ] || fail 'target mismatch'
+repo=$(uci -q get n100-update.main.repository)
+[ "$repo" = nzero1988/n100-openwrt ] || fail 'unexpected repository'
+# Refuse automatic updates unless this customized build is installed.
+[ -r /etc/n100-build-id ] || fail 'no installed build identity'
+# Refuse disks whose boot/root partitions were resized after installation.
+(
+  set +u
+  . /lib/functions.sh
+  . /lib/upgrade/common.sh
+  export_bootdevice && export_partdevice bootpart 1 && export_partdevice rootpart 2 || exit 1
+  [ "$(cat /sys/class/block/$bootpart/size)" = 65536 ] &&
+  [ "$(cat /sys/class/block/$rootpart/size)" = 4194304 ]
+) || fail 'installed partition sizes differ from fixed layout'
+get() { curl --fail --location --retry 3 --connect-timeout 20 --max-time 1800 --proto '=https' --proto-redir '=https' "$1" -o "$2"; }
+get "https://api.github.com/repos/$repo/releases/latest" "$work/release.json"
+tag=$(jsonfilter -i "$work/release.json" -e '@.tag_name')
+case "$tag" in n100-25.12.*) ;; *) fail 'release outside supported series';; esac
+[ "$tag" != "$(cat /etc/n100-build-id)" ] || { log 'Already current'; exit 0; }
+get "https://github.com/$repo/releases/download/$tag/manifest.json" "$work/manifest.json"
+field() { jsonfilter -i "$work/manifest.json" -e "@.$1"; }
+[ "$(field tag)" = "$tag" ] || fail 'tag mismatch'
+[ "$(field target)" = x86/64 ] || fail 'manifest target mismatch'
+[ "$(field layout)" = squashfs-2048-v1 ] || fail 'unsupported disk layout'
+mode=bios; [ ! -d /sys/firmware/efi ] || mode=efi
+file=$(field "${mode}_file"); sha=$(field "${mode}_sha256")
+case "$file" in openwrt-*-x86-64-generic-squashfs-combined*.img.gz) ;; *) fail 'invalid filename';; esac
+case "$file" in */*|*..*) fail 'unsafe filename';; esac
+[ "${#sha}" = 64 ] || fail 'invalid checksum'
+case "$sha" in *[!a-f0-9]*) fail 'invalid checksum';; esac
+# Image is downloaded to tmpfs: require 1 GiB free first.
+free=$(df -Pk /tmp | awk 'END {print $4}')
+[ "$free" -ge 1048576 ] || fail 'insufficient temporary space'
+get "https://github.com/$repo/releases/download/$tag/$file" "$work/firmware.img.gz"
+printf '%s  %s\n' "$sha" "$work/firmware.img.gz" | sha256sum -c - || fail 'checksum mismatch'
+sysupgrade -T "$work/firmware.img.gz" || fail 'sysupgrade compatibility check failed'
+if [ "${1:-}" = --check ]; then log "Verified $tag ($mode); no upgrade requested"; exit 0; fi
+# Keep a local configuration backup; sysupgrade also carries the configured keep list.
+mkdir -p /root/n100-backups
+sysupgrade -b /root/n100-backups/pre-upgrade.tar.gz || fail 'backup failed'
+log "Installing $tag; router will reboot"
+sysupgrade "$work/firmware.img.gz"

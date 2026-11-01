@@ -1,0 +1,26 @@
+#!/bin/sh
+if [ "$(uci -q get n100-update.main.initialized)" != 1 ]; then
+uci set system.@system[0].hostname='N100-OpenWrt'
+uci set system.@system[0].timezone='CST-8'
+uci set system.@system[0].zonename='Asia/Shanghai'
+uci set network.lan.ipaddr='192.168.10.1'
+uci set network.wan.proto='dhcp'
+uci set network.wan.device='eth0'
+uci -q delete network.wan.username
+uci -q delete network.wan.password
+bridge=$(uci show network | sed -n "s/^\(network\.[^=]*\)\.name='br-lan'$/\1/p" | head -1)
+if [ -n "$bridge" ]; then
+  uci -q delete "$bridge.ports"
+  for port in eth1 eth2 eth3; do uci add_list "$bridge.ports=$port"; done
+fi
+uci set network.lan.device='br-lan'
+uci set luci.main.lang='zh_cn'
+uci -q set openclash.config.enable='0'
+uci set n100-update.main.initialized='1'
+uci commit
+fi
+mkdir -p /etc/crontabs
+touch /etc/crontabs/root
+grep -q '/usr/sbin/n100-update' /etc/crontabs/root || echo '0 4 * * 0 /usr/sbin/n100-update >> /tmp/n100-update.log 2>&1' >> /etc/crontabs/root
+/etc/init.d/cron enable
+exit 0
