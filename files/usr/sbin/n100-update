@@ -46,6 +46,8 @@ sysupgrade -T "$work/firmware.img.gz" || fail 'sysupgrade compatibility check fa
 if [ "${1:-}" = --check ]; then log "Verified $tag ($mode); no upgrade requested"; exit 0; fi
 # Keep a local configuration backup; sysupgrade also carries the configured keep list.
 mkdir -p /root/n100-backups
-sysupgrade -b /root/n100-backups/pre-upgrade.tar.gz || fail 'backup failed'
+rm -f /root/n100-backups/pre-upgrade.tar.gz
+sysupgrade -b "$work/config.tar.gz" || fail 'backup failed'
+mv "$work/config.tar.gz" /root/n100-backups/pre-upgrade.tar.gz
 log "Installing $tag; router will reboot"
 sysupgrade "$work/firmware.img.gz"
