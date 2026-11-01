@@ -33,7 +33,7 @@ field() { jsonfilter -i "$work/manifest.json" -e "@.$1"; }
 [ "$(field layout)" = squashfs-2048-v1 ] || fail 'unsupported disk layout'
 mode=bios; [ ! -d /sys/firmware/efi ] || mode=efi
 file=$(field "${mode}_file"); sha=$(field "${mode}_sha256")
-case "$file" in openwrt-*-x86-64-generic-squashfs-combined*.img.gz) ;; *) fail 'invalid filename';; esac
+case "$file" in openwrt-x86-64-generic-squashfs-combined*.img.gz|openwrt-*-x86-64-generic-squashfs-combined*.img.gz) ;; *) fail 'invalid filename';; esac
 case "$file" in */*|*..*) fail 'unsafe filename';; esac
 [ "${#sha}" = 64 ] || fail 'invalid checksum'
 case "$sha" in *[!a-f0-9]*) fail 'invalid checksum';; esac

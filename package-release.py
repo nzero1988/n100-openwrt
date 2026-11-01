@@ -4,7 +4,7 @@ source, output, tag = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.
 output.mkdir(parents=True, exist_ok=True)
 manifest = {"tag": tag, "target": "x86/64", "layout": "squashfs-2048-v1"}
 for mode, suffix in [("bios", "combined.img.gz"), ("efi", "combined-efi.img.gz")]:
-    matches = list(source.glob(f"openwrt-*-x86-64-generic-squashfs-{suffix}"))
+    matches = list(source.glob(f"openwrt*-x86-64-generic-squashfs-{suffix}"))
     if len(matches) != 1:
         raise SystemExit(f"Expected one {mode} image, found {matches}")
     image = matches[0]
