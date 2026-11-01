@@ -3,12 +3,25 @@ if [ "$(uci -q get n100-update.main.initialized)" != 1 ]; then
 uci set system.@system[0].hostname='N100-OpenWrt'
 uci set system.@system[0].timezone='CST-8'
 uci set system.@system[0].zonename='Asia/Shanghai'
+uci -q get network.lan >/dev/null || uci set network.lan='interface'
+uci set network.lan.proto='static'
 uci set network.lan.ipaddr='192.168.10.1'
+uci set network.lan.netmask='255.255.255.0'
+uci -q get network.wan >/dev/null || uci set network.wan='interface'
 uci set network.wan.proto='dhcp'
 uci set network.wan.device='eth0'
+uci -q get network.wan6 >/dev/null || uci set network.wan6='interface'
+uci set network.wan6.proto='dhcpv6'
+uci set network.wan6.device='@wan'
 uci -q delete network.wan.username
 uci -q delete network.wan.password
 bridge=$(uci show network | sed -n "s/^\(network\.[^=]*\)\.name='br-lan'$/\1/p" | head -1)
+if [ -z "$bridge" ]; then
+  bridge='network.n100_lan'
+  uci set "$bridge=device"
+  uci set "$bridge.name=br-lan"
+  uci set "$bridge.type=bridge"
+fi
 if [ -n "$bridge" ]; then
   uci -q delete "$bridge.ports"
   for port in eth1 eth2 eth3; do uci add_list "$bridge.ports=$port"; done
