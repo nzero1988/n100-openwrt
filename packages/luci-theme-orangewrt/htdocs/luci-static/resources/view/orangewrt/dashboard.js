@@ -14,7 +14,7 @@ var deviceCall = rpc.declare({ object: 'network.device', method: 'status', param
 function text(value) { return value == null || value === '' ? '—' : String(value); }
 function address(data) { return (data['ipv4-address'] || []).map(function(a) { return a.address + '/' + a.mask; }).join(', ') || '未获取 IPv4'; }
 function uptime(seconds) { seconds = Math.max(0, Number(seconds) || 0); return Math.floor(seconds / 86400) + ' 天 ' + Math.floor(seconds % 86400 / 3600) + ' 小时 ' + Math.floor(seconds % 3600 / 60) + ' 分钟'; }
-function kv(label, value) { return E('div', { 'class': 'ow-kv' }, [ E('span', {}, label), E('span', {}, text(value)) ]); }
+function kv(label, value) { return E('div', { 'class': 'ow-kv' }, [ E('span', {}, label), E('span', {}, value && value.nodeType ? [value] : text(value)) ]); }
 function link(label, path) { return E('a', { href: L.url.apply(L, path.split('/')) }, label); }
 
 return view.extend({
@@ -30,6 +30,8 @@ return view.extend({
     if (!document.querySelector('link[data-orangewrt-dashboard]'))
       document.head.appendChild(E('link', { rel: 'stylesheet', href: L.resource('..') + '/orangewrt/theme.css', 'data-orangewrt-dashboard': '' }));
     var board = data[0], info = data[1], wan = data[2], lan = data[3];
+    var model = board.model || '';
+    if (!model || /default string|to be filled|system product name|not specified/i.test(model)) model = (board.release || {}).target || 'x86-64 主路由';
     var down = E('span', {}, '等待采样'), up = E('span', {}, '等待采样');
     var memory = E('span'), load = E('span'), running = E('span', {}, uptime(info.uptime));
     var last = null, history = [], wanDevice = wan.l3_device || wan.device;
@@ -67,6 +69,8 @@ return view.extend({
         var max = Math.max.apply(Math, [1].concat(history.reduce(function(a, p) { return a.concat(p); }, []))) * 1.1;
         function path(index) { return history.map(function(p, i) { return (i ? 'L' : 'M') + (history.length > 1 ? i * 600 / (history.length - 1) : 0).toFixed(2) + ' ' + (160 - p[index] / max * 140).toFixed(2); }).join(' '); }
         downloadLine.setAttribute('d', path(0)); uploadLine.setAttribute('d', path(1));
+        downloadLine.setAttribute('stroke', 'var(--ow-accent)'); downloadLine.setAttribute('stroke-width', '3'); downloadLine.setAttribute('fill', 'none');
+        uploadLine.setAttribute('stroke', 'var(--ow-muted)'); uploadLine.setAttribute('stroke-width', '2'); uploadLine.setAttribute('fill', 'none'); uploadLine.setAttribute('stroke-dasharray', '5 4');
         ceiling.textContent = '纵轴 0～' + max.toFixed(1) + ' Mbps';
       }
       last = now;
@@ -78,7 +82,7 @@ return view.extend({
       return E('article', { 'class': 'ow-card' }, [ E('div', { 'class': 'ow-label' }, label), E('div', { 'class': 'ow-value' }, [ value, E('span', { 'class': 'ow-unit' }, unit) ]), E('div', { 'class': 'ow-detail' }, detail) ]);
     }
     var root = E('div', { 'class': 'ow-real' }, [
-      E('div', { 'class': 'ow-heading' }, [ E('div', {}, [ E('h2', {}, 'OrangeWrt · 网络总览'), E('p', { 'class': 'ow-subtitle' }, text(board.hostname) + ' · ' + text(board.model) + ' · 实际设备数据') ]), E('div', { 'class': 'ow-chip' }, data[4].trim() || (board.release || {}).description || 'OpenWrt') ]),
+      E('div', { 'class': 'ow-heading' }, [ E('div', {}, [ E('h2', {}, 'OrangeWrt · 网络总览'), E('p', { 'class': 'ow-subtitle' }, text(board.hostname) + ' · ' + model + ' · 实际设备数据') ]), E('div', { 'class': 'ow-chip' }, data[4].trim() || (board.release || {}).description || 'OpenWrt') ]),
       E('div', { 'class': 'ow-grid' }, [ card('WAN 下载', down, 'Mbps', '每 3 秒采样，首次需等待'), card('WAN 上传', up, 'Mbps', '按网口字节增量计算'), card('内存使用', memory, 'GB', '可用内存口径，包含缓存修正'), card('1 分钟负载', load, '', '负载不是 CPU 使用百分比') ]),
       E('div', { 'class': 'ow-columns' }, [
         E('article', { 'class': 'ow-panel' }, [ E('h3', {}, 'WAN 流量趋势'), chart, E('div', { 'class': 'ow-chart-labels' }, [ E('span', {}, '实线：下载 · 虚线：上传'), ceiling ]), E('p', { 'class': 'ow-note' }, '仅显示打开本页面后的采样，最多保留最近 30 个点。') ]),
