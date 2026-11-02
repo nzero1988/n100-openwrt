@@ -1,0 +1,16 @@
+{
+  "luci-orangewrt-dashboard": {
+    "description": "Read system and WAN status for the OrangeWrt dashboard",
+    "read": {
+      "ubus": {
+        "system": [ "board", "info" ],
+        "network.interface.wan": [ "status" ],
+        "network.interface.lan": [ "status" ],
+        "network.device": [ "status" ],
+        "file": [ "read" ]
+      },
+      "file": { "/etc/n100-build-id": [ "read" ] },
+      "uci": [ "n100-update" ]
+    }
+  }
+}

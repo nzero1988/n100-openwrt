@@ -27,6 +27,9 @@ p.write_text(s)
 PY
 mkdir -p "$src/package/custom"
 cp -a "$base/openclash-feed/luci-app-openclash" "$src/package/custom/"
+if [[ -d "$repo/packages" ]]; then
+  cp -a "$repo/packages/." "$src/package/custom/"
+fi
 cd "$src"
 cp feeds.conf.default feeds.conf
 printf '\nsrc-link ssr %s\n' "$base/ssr-feed" >> feeds.conf

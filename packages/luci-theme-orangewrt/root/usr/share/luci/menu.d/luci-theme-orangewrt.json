@@ -1,0 +1,8 @@
+{
+  "admin/status/orangewrt": {
+    "title": "OrangeWrt 总览",
+    "order": 0,
+    "action": { "type": "view", "path": "orangewrt/dashboard" },
+    "depends": { "acl": [ "luci-orangewrt-dashboard" ] }
+  }
+}

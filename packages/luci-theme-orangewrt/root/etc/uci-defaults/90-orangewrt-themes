@@ -1,0 +1,7 @@
+#!/bin/sh
+uci -q get luci.themes >/dev/null || uci set luci.themes='internal'
+uci set luci.themes.OrangeWrt_Orange='/luci-static/orangewrt-orange'
+uci set luci.themes.OrangeWrt_Cyan='/luci-static/orangewrt-cyan'
+uci commit luci
+# Register choices without changing the current theme or any network settings.
+exit 0
