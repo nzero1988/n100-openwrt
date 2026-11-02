@@ -41,6 +41,16 @@ cp "$repo/config.seed" .config
 mkdir -p files
 cp -a "$repo/files/." files/
 chmod +x files/etc/uci-defaults/99-n100 files/usr/sbin/n100-update
+mkdir -p files/etc/uci-defaults
+cat > files/etc/uci-defaults/98-n100-package-feeds <<'SH'
+#!/bin/sh
+# The local SSR feed is compiled into this firmware, not hosted by OpenWrt.
+for feedfile in /etc/apk/repositories.d/distfeeds.list /etc/opkg/distfeeds.conf; do
+  [ ! -f "$feedfile" ] || sed -i '\|https://downloads.openwrt.org/.*[/]ssr[/]|d' "$feedfile"
+done
+exit 0
+SH
+chmod +x files/etc/uci-defaults/98-n100-package-feeds
 # Reuse the packaged mihomo binary for OpenClash; neither proxy is enabled by default.
 mkdir -p files/etc/openclash/core
 ln -sfn /usr/libexec/mihomo files/etc/openclash/core/clash_meta
